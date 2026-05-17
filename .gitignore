@@ -1,0 +1,17 @@
+# Results
+results/*
+!results/.gitkeep
+
+# Generated wordlists
+wordlists/generated/*
+!wordlists/generated/.gitkeep
+
+# External symlinks / downloaded references
+wordlists/external/*
+!wordlists/external/.gitkeep
+
+# Temp / logs
+*.log
+*.tmp
+*.bak
+.DS_Store

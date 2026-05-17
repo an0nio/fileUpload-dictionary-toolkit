@@ -1,0 +1,16 @@
+file
+files
+upload
+uploadFile
+image
+images
+avatar
+photo
+picture
+screenshot
+attachment
+document
+media
+fileToUpload
+userfile
+data

@@ -1,0 +1,16 @@
+image/jpeg
+image/png
+image/gif
+image/webp
+image/bmp
+image/svg+xml
+text/plain
+text/html
+application/octet-stream
+application/x-php
+application/x-httpd-php
+application/php
+application/pdf
+application/zip
+application/xml
+text/xml

