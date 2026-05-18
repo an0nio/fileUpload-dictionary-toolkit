@@ -33,6 +33,14 @@ La herramienta solo organiza fuentes y genera listas reutilizables para pruebas 
 │       ├── jsp/
 │       ├── ssi/
 │       ├── node/
+│       ├── limited_uploads
+│       │   ├── archives
+│       │   ├── documents
+│       │   ├── dos
+│       │   ├── html
+│       │   ├── metadata
+│       │   ├── svg
+│       │   └── xml
 │       └── magic_numbers/
 ├── requests/
 ├── results/
@@ -68,12 +76,11 @@ bin/gen_filename_wordlist.sh [dangerous_exts_file] [output_file] [allowed_exts_f
 
 Argumentos:
 
-| Argumento | Descripción | Default |
-|---|---|---|
-| `dangerous_exts_file` | extensiones peligrosas o interesantes | `wordlists/custom/php_exts.txt` |
-| `output_file` | archivo generado | `wordlists/generated/evasive_filenames.txt` |
-| `allowed_exts_file` | extensiones permitidas por la app | `wordlists/custom/allowed_image_exts.txt` |
-
+| Argumento | Descripción |
+|---|---|
+| `dangerous_exts_file` | extensiones peligrosas o interesantes |
+| `output_file` | archivo generado |
+| `allowed_exts_file` | extensiones permitidas por la app |
 La idea es combinar:
 
 ```text
@@ -188,14 +195,11 @@ ffuf \
 
 Ejemplos:
 
-| Filename aceptado | Candidato GET |
-|---|---|
-| `shell.jpg%00.phar` | `shell.jpg%2500.phar` |
-| `shell.phar%0a.jpg` | `shell.phar%250a.jpg` |
-| `shell%2ephp.jpg` | `shell%252ephp.jpg` |
-
-
-
+| Filename aceptado |
+|---|
+| `shell.jpg%00.phar` |
+| `shell.phar%0a.jpg` |
+| `shell%2ephp.jpg` |
 # 3. MIME types
 
 No hay script específico para generar MIME types. La herramienta deja dos fuentes listas para usar:
@@ -266,9 +270,36 @@ Estos ficheros no son payloads completos. Son referencias para copiar o prefijar
 
 ---
 
+# 6. Limited uploads
+
+Además de generar filenames evasivos, el toolkit incluye snippets para escenarios donde el upload está limitado a formatos concretos.
+
+Ruta propuesta:
+
+```text
+wordlists/content/limited_uploads/
+```
 
 
-# 6. Limpieza
+## 6.1 Matriz de limited upload
+
+| Tipo permitido | Ataque posible | Condición necesaria |
+|---|---|---|
+| `.html` | Stored XSS / CSRF | HTML accesible same-origin |
+| `.svg` | Stored XSS | SVG renderizado inline |
+| `.svg` / `.xml` | XXE | Parser XML inseguro |
+| `.svg` / `.xml` | SSRF vía XXE | Entidades externas permitidas |
+| `.jpg` / `.png` | XSS en metadata | EXIF mostrado sin escapar |
+| `.jpg` / `.png` | Pixel flood / DoS | Procesado de imagen vulnerable |
+| `.zip` | Decompression bomb | Descompresión automática |
+| `.zip` / `.tar` | Zip Slip | Paths no normalizados |
+| `.pdf` / `.docx` / `.xlsx` | XXE / SSRF | Viewer/parser vulnerable |
+| archivo grande | DoS almacenamiento | Sin límite de tamaño |
+## HTML
+
+
+
+# 7. Limpieza
 
 Eliminar resultados y wordlists generadas:
 

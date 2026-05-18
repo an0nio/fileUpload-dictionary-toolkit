@@ -1,0 +1,8 @@
+Comment
+Artist
+ImageDescription
+UserComment
+XPComment
+XPTitle
+XPAuthor
+Copyright

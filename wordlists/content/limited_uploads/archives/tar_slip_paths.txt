@@ -1,0 +1,11 @@
+../shell.php
+../../shell.php
+../../../shell.php
+../../../../var/www/html/shell.php
+../../../../tmp/shell.php
+../public/shell.php
+../../public/shell.php
+../uploads/shell.php
+../../uploads/shell.php
+../profile_images/shell.php
+../../profile_images/shell.php
