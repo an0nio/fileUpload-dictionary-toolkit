@@ -1,10 +1,62 @@
 # fileUpload dictionary toolkit
 
-Toolkit pequeño para **crear diccionarios de file upload**.
+Toolkit pequeño para **crear diccionarios y snippets reutilizables para pruebas de file upload**.
 
-La herramienta solo organiza fuentes y genera listas reutilizables para pruebas de upload:
+No es un wrapper de `ffuf`, Burp, curl ni ninguna herramienta de explotación. Su objetivo es ayudarte a preparar listas y plantillas que luego usarás como quieras.
 
-## Estructura
+```text
+La herramienta genera diccionarios. El usuario decide cómo usarlos.
+```
+
+---
+
+## Idea de origen
+
+La herramienta nace como una extensión de una idea clásica de HTB: generar combinaciones evasivas de nombres de archivo a partir de:
+
+- una lista de extensiones peligrosas/interesantes
+- una lista de separadores o caracteres conflictivos
+- una extensión permitida por la aplicación
+
+Ejemplo base:
+
+```bash
+for char in '%20' '%0a' '%00' '%0d0a' '/' '.\\' '.' '…' ':'; do
+    for ext in '.php' '.php3' '.php4' '.php5' '.php7' '.pht' '.phps' '.phar' '.phpt' '.pgif' '.phtml' '.phtm' '.inc' ; do
+        echo "shell$char$ext.jpg" >> wordlist.txt
+        echo "shell$ext$char.jpg" >> wordlist.txt
+        echo "shell.jpg$char$ext" >> wordlist.txt
+        echo "shell.jpg$ext$char" >> wordlist.txt
+    done
+done
+```
+
+Conceptualmente, esto es el **producto cartesiano** de varios conjuntos:
+
+```text
+extensiones peligrosas × separadores × extensiones permitidas × patrones de filename
+```
+
+Este toolkit generaliza esa idea para que no tengas que editar bucles a mano cada vez.
+
+---
+
+## Qué puede generar u organizar
+
+| Área | Qué aporta |
+|---|---|
+| Filenames evasivos | Combina extensiones peligrosas con extensiones permitidas y separadores conflictivos |
+| Extensiones peligrosas | Listas custom para PHP, ASP.NET, JSP y combinaciones propias |
+| Extensiones permitidas | Listas de allowlist como `.jpg`, `.png`, `.gif`, `.pdf`, etc. |
+| MIME types | Fuentes listas para usar: lista custom y SecLists si está disponible |
+| Contenido manual | Snippets PHP, ASPX, JSP, SSI, EJS, `.htaccess`, etc. |
+| Magic numbers | Firmas copiables para prefijar contenido manualmente |
+| Candidatos GET | Convierte filenames aceptados en variantes razonables para pedir por URL |
+| Examples | Casos de uso concretos para recordar cómo generar diccionarios |
+
+---
+
+## Estructura esperada
 
 ```text
 /opt/fileUpload/
@@ -24,8 +76,7 @@ La herramienta solo organiza fuentes y genera listas reutilizables para pruebas 
 │   │   ├── upload_common_mime.txt
 │   │   └── upload_fieldnames.txt
 │   ├── external/
-│   │   ├── seclists-*.txt
-│   │   └── payloadsallthethings/
+│   │   └── seclists-*.txt
 │   ├── generated/
 │   └── content/
 │       ├── php/
@@ -33,19 +84,23 @@ La herramienta solo organiza fuentes y genera listas reutilizables para pruebas 
 │       ├── jsp/
 │       ├── ssi/
 │       ├── node/
-│       ├── limited_uploads
-│       │   ├── archives
-│       │   ├── documents
-│       │   ├── dos
-│       │   ├── html
-│       │   ├── metadata
-│       │   ├── svg
-│       │   └── xml
 │       └── magic_numbers/
 ├── requests/
 ├── results/
 └── examples/
 ```
+
+La separación importante es:
+
+```text
+wordlists/custom/      listas pequeñas, curadas y versionables
+wordlists/external/    symlinks a fuentes externas como SecLists
+wordlists/generated/   salidas generadas por scripts
+wordlists/content/     snippets y referencias copiables
+examples/              recetas prácticas de generación
+```
+
+---
 
 ## Instalación
 
@@ -62,7 +117,13 @@ Crear symlinks a SecLists si está instalado:
 bin/setup_symlinks.sh
 ```
 
+Comprobar symlinks rotos:
 
+```bash
+find wordlists/external -xtype l
+```
+
+Si no imprime nada, no hay symlinks rotos.
 
 ---
 
@@ -76,16 +137,21 @@ bin/gen_filename_wordlist.sh [dangerous_exts_file] [output_file] [allowed_exts_f
 
 Argumentos:
 
-| Argumento | Descripción |
-|---|---|
-| `dangerous_exts_file` | extensiones peligrosas o interesantes |
-| `output_file` | archivo generado |
-| `allowed_exts_file` | extensiones permitidas por la app |
-La idea es combinar:
+| Argumento | Descripción | Default |
+|---|---|---|
+| `dangerous_exts_file` | Extensiones peligrosas/interesantes | `wordlists/custom/php_exts.txt` |
+| `output_file` | Archivo generado | `wordlists/generated/evasive_filenames.txt` |
+| `allowed_exts_file` | Extensiones permitidas por la app | `wordlists/custom/allowed_image_exts.txt` |
+
+La idea es generar patrones como:
 
 ```text
-extensión peligrosa + separadores + extensión permitida
-extensión permitida + separadores + extensión peligrosa
+shell{dangerous}{allowed}
+shell{allowed}{dangerous}
+shell{dangerous}{separator}{allowed}
+shell{allowed}{separator}{dangerous}
+shell{separator}{dangerous}{allowed}
+shell{allowed}{dangerous}{separator}
 ```
 
 Ejemplos de separadores usados:
@@ -105,120 +171,236 @@ Ejemplos de separadores usados:
 :
 ```
 
-## 1.1 Perfil por defecto: PHP contra whitelist de imágenes
+---
 
-Usa PHP como extensiones peligrosas y `.jpg`, `.jpeg`, `.png`, `.gif` como extensiones permitidas.
+## 1.1 Uso por defecto: PHP contra allowlist de imágenes
+
+Usa:
+
+- peligrosas: `wordlists/custom/php_exts.txt`
+- permitidas: `wordlists/custom/allowed_image_exts.txt`
+- salida: `wordlists/generated/evasive_filenames.txt`
 
 ```bash
 cd /opt/fileUpload
 
-bin/gen_filename_wordlist.sh \
-  wordlists/custom/php_exts.txt \
-  wordlists/generated/php_image_evasive.txt
+bin/gen_filename_wordlist.sh
 ```
 
 Salida:
 
 ```text
-wordlists/generated/php_image_evasive.txt
+wordlists/generated/evasive_filenames.txt
 ```
 
-## 1.2 Whitelist personalizada
+---
 
-Si la aplicación solo permite `.jpg`:
+## 1.2 PHP contra whitelist solo `.jpg`
+
+Crear allowlist temporal:
 
 ```bash
 printf '.jpg\n' > wordlists/generated/allowed_jpg_only.txt
+```
 
+Generar diccionario:
+
+```bash
 bin/gen_filename_wordlist.sh \
   wordlists/custom/php_exts.txt \
   wordlists/generated/php_jpg_only.txt \
   wordlists/generated/allowed_jpg_only.txt
 ```
 
+Ejemplos de salida esperada:
+
+```text
+shell.php.jpg
+shell.jpg.php
+shell.phtml.jpg
+shell.jpg.phtml
+shell.phar.jpg
+shell.jpg.phar
+shell.php%00.jpg
+shell.jpg%00.php
+shell.php%0a.jpg
+shell.jpg%0a.phtml
+```
+
 ---
 
-
-## Ejemplo de uso con ffuf - con `upload.req`
-
-Tras generar  el diccionario `php_image_evasive.txt`, podemos guardar la petición como `upload.req` y añadir FUZZ en el lugar correcto en la petición y fuzzear del siguiente modo
+## 1.3 PHP contra `.jpg` y `.png`
 
 ```bash
-# Ajustar el filtro según convenga
-ffuf \
-  -request upload.req \
-  -request-proto http \
-  -w /opt/fileUpload/wordlists/generated/php_image_evasive.txt \
-  -mr 'File successfully uploaded'
-  -of json \
-  -o /opt/fileUpload/results/upload_acceptance.json
+cat > wordlists/generated/allowed_jpg_png.txt <<'EOF'
+.jpg
+.png
+EOF
+
+bin/gen_filename_wordlist.sh \
+  wordlists/custom/php_exts.txt \
+  wordlists/generated/php_jpg_png.txt \
+  wordlists/generated/allowed_jpg_png.txt
 ```
 
-Obteniendo una lista de resultados válidos como sigue: 
+---
+
+## 1.4 ASP.NET contra imágenes
 
 ```bash
-jq -r '.results[].input.FUZZ' /opt/fileUpload/results/upload_acceptance.json \
-  > /opt/fileUpload/results/accepted_filenames.txt
+bin/gen_filename_wordlist.sh \
+  wordlists/custom/asp_exts.txt \
+  wordlists/generated/aspnet_image_evasive.txt \
+  wordlists/custom/allowed_image_exts.txt
 ```
 
-# 2. Convertir filenames aceptados en candidatos GET
+Ejemplos de salida:
+
+```text
+shell.aspx.jpg
+shell.jpg.aspx
+shell.ashx.jpg
+shell.jpg.ashx
+shell.config.jpg
+shell.jpg.config
+```
+
+---
+
+## 1.5 JSP contra imágenes
+
+```bash
+bin/gen_filename_wordlist.sh \
+  wordlists/custom/jsp_exts.txt \
+  wordlists/generated/jsp_image_evasive.txt \
+  wordlists/custom/allowed_image_exts.txt
+```
+
+Ejemplos de salida:
+
+```text
+shell.jsp.jpg
+shell.jpg.jsp
+shell.jspx.jpg
+shell.jpg.jspx
+shell.war.jpg
+shell.jpg.war
+```
+
+---
+
+## 1.6 Stack desconocido: PHP + ASP.NET + JSP
+
+Crear lista combinada:
+
+```bash
+cat \
+  wordlists/custom/php_exts.txt \
+  wordlists/custom/asp_exts.txt \
+  wordlists/custom/jsp_exts.txt \
+  | tr -d '\r' \
+  | sed 's/#.*$//' \
+  | sed '/^$/d' \
+  | sort -u \
+  > wordlists/generated/server_side_exts.txt
+```
+
+Generar filenames:
+
+```bash
+bin/gen_filename_wordlist.sh \
+  wordlists/generated/server_side_exts.txt \
+  wordlists/generated/server_side_image_evasive.txt \
+  wordlists/custom/allowed_image_exts.txt
+```
+
+---
+
+## 1.7 Allowlist no imagen: PDF, ZIP, XML, SVG
+
+Si la aplicación permite documentos o formatos concretos:
+
+```bash
+cat > wordlists/generated/allowed_docs.txt <<'EOF'
+.pdf
+.docx
+.xlsx
+.zip
+.xml
+.svg
+EOF
+
+bin/gen_filename_wordlist.sh \
+  wordlists/custom/php_exts.txt \
+  wordlists/generated/php_docs_evasive.txt \
+  wordlists/generated/allowed_docs.txt
+```
+
+Esto genera combinaciones como:
+
+```text
+shell.php.pdf
+shell.pdf.php
+shell.phtml.docx
+shell.zip.phar
+shell.svg.php
+```
+
+---
+
+# 2. Combinar extensiones peligrosas
 
 Script:
 
 ```bash
-bin/gen_get_candidates.py accepted_filenames.txt > candidates_get.txt
+bin/build_extension_wordlist.sh
 ```
 
-## Por qué existe
+Objetivo: combinar listas custom propias en una única lista de extensiones peligrosas/interesantes.
 
-En file upload, el nombre que el servidor acepta durante el upload no siempre coincide con el nombre que se debe pedir después por URL.
-
-Ejemplo:
+Salida sugerida:
 
 ```text
-filename aceptado: shell.jpg%00.phar
+wordlists/generated/all_dangerous_exts.txt
 ```
 
-Si el backend lo guarda literalmente como los caracteres `%`, `0`, `0`, entonces para pedirlo por URL necesitas codificar el `%` como `%25`. Este script contempla varias formas de cómo se puede guardar el archivo en el backend. Podemos hacer fuzzing con `candidates_get.txt` como sigue: 
+Importante:
 
-```bash
-# Ajustar el filtro según convenga. En este caso se supone que como payload se ha utilizado ./wordlists/content/php/php_funciona.php
-ffuf \
-  -w /opt/fileUpload/results/candidates_get.txt \
-  -u "http://$target/profile_images/FUZZ" \
-  -mr 'php_funciona' \
-  -mc all \
-  -raw \
-  -of json \
-  -o /opt/fileUpload/results/get_rce.json
+```text
+PayloadsAllTheThings no se usa como fuente para generar extensiones.
 ```
 
-Ejemplos:
+Su lista mezcla extensiones con payloads ya compuestos, por ejemplo `.jpg.php` o `.php%00.jpg`, y eso no encaja con este generador. Aquí queremos listas limpias de extensiones para componer nosotros el producto cartesiano.
 
-| Filename aceptado |
-|---|
-| `shell.jpg%00.phar` |
-| `shell.phar%0a.jpg` |
-| `shell%2ephp.jpg` |
-# 3. MIME types
+---
 
-No hay script específico para generar MIME types. La herramienta deja dos fuentes listas para usar:
+# 3. Fuentes de MIME types
+
+No hay script específico para MIME types. Normalmente basta con dos fuentes:
 
 ```text
 wordlists/custom/upload_common_mime.txt
 wordlists/external/seclists-all-content-types.txt
 ```
 
+Uso conceptual:
+
+| Fuente | Uso |
+|---|---|
+| `upload_common_mime.txt` | Lista corta y práctica |
+| `seclists-all-content-types.txt` | Lista amplia desde SecLists |
+
+---
 
 # 4. Contenido manual para archivos
 
-En vez de generar archivos de contenido mediante script, el toolkit incluye snippets en:
+El toolkit incluye snippets en:
 
 ```text
 wordlists/content/
 ```
 
-La idea es que copies manualmente el contenido que necesites y lo combines con tu propio archivo, extensión o magic bytes.
+La idea no es generar automáticamente archivos finales, sino tener contenido reutilizable para copiar, combinar o prefijar manualmente.
 
 ---
 
@@ -233,11 +415,34 @@ wordlists/content/php/
 └── htaccess_enable_php_for_images.htaccess
 ```
 
- `php_funciona.php` imprime: `php_funciona` mediante `<?php echo base64_decode("cGhwX2Z1bmNpb25h"); ?>`
+`php_funciona.php` imprime:
 
+```text
+php_funciona
+```
 
+mediante:
 
-`htaccess_enable_php_for_images.htaccess` es un Snippet para laboratorios Apache donde se pueda subir `.htaccess`: `AddType application/x-httpd-php .jpg .jpeg .png .gif`
+```php
+<?php echo base64_decode("cGhwX2Z1bmNpb25h"); ?>
+```
+
+`php_introspection.php` sirve para imprimir información del archivo ejecutado:
+
+```text
+basename_hex
+file_hex
+realpath_hex
+script_filename_hex
+document_root_hex
+request_uri
+```
+
+`.htaccess` para laboratorio Apache:
+
+```apache
+AddType application/x-httpd-php .jpg .jpeg .png .gif
+```
 
 ---
 
@@ -250,11 +455,11 @@ wordlists/content/ssi/shtml_funciona.shtml
 wordlists/content/node/ejs_funciona.ejs
 ```
 
-
+---
 
 # 5. Magic numbers / formatos
 
-Magic numbers y firmas copiables:
+Firmas copiables:
 
 ```text
 wordlists/content/magic_numbers/
@@ -268,38 +473,132 @@ wordlists/content/magic_numbers/
 
 Estos ficheros no son payloads completos. Son referencias para copiar o prefijar contenido manualmente.
 
+Ejemplos:
+
+| Formato | Firma |
+|---|---|
+| GIF87a | `47 49 46 38 37 61` |
+| GIF89a | `47 49 46 38 39 61` |
+| JPEG | `FF D8 FF` |
+| PNG | `89 50 4E 47 0D 0A 1A 0A` |
+| PDF | `%PDF-` |
+| ZIP | `50 4B 03 04` |
+
 ---
 
-# 6. Limited uploads
+# 6. Payloads para uploads limitados
 
-Además de generar filenames evasivos, el toolkit incluye snippets para escenarios donde el upload está limitado a formatos concretos.
-
-Ruta propuesta:
+Cuando no buscas extensión ejecutable, sino impacto con tipos permitidos, usa:
 
 ```text
-wordlists/content/limited_uploads/
+wordlists/content/limited_upload/
 ```
 
+Organización recomendada:
 
-## 6.1 Matriz de limited upload
+```text
+limited_upload/
+├── html/
+├── svg/
+├── xml/
+├── metadata/
+├── archives/
+├── documents/
+└── dos/
+```
 
-| Tipo permitido | Ataque posible | Condición necesaria |
+Matriz mental:
+
+| Tipo permitido | Ataque posible | Carpeta sugerida |
 |---|---|---|
-| `.html` | Stored XSS / CSRF | HTML accesible same-origin |
-| `.svg` | Stored XSS | SVG renderizado inline |
-| `.svg` / `.xml` | XXE | Parser XML inseguro |
-| `.svg` / `.xml` | SSRF vía XXE | Entidades externas permitidas |
-| `.jpg` / `.png` | XSS en metadata | EXIF mostrado sin escapar |
-| `.jpg` / `.png` | Pixel flood / DoS | Procesado de imagen vulnerable |
-| `.zip` | Decompression bomb | Descompresión automática |
-| `.zip` / `.tar` | Zip Slip | Paths no normalizados |
-| `.pdf` / `.docx` / `.xlsx` | XXE / SSRF | Viewer/parser vulnerable |
-| archivo grande | DoS almacenamiento | Sin límite de tamaño |
-## HTML
+| `.html` | Stored XSS / CSRF chaining | `limited_upload/html/` |
+| `.svg` | Stored XSS | `limited_upload/svg/` |
+| `.svg` / `.xml` | XXE / SSRF | `limited_upload/svg/`, `limited_upload/xml/` |
+| `.jpg` / `.png` | XSS en metadata | `limited_upload/metadata/` |
+| `.zip` / `.tar` | Zip Slip | `limited_upload/archives/` |
+| `.pdf` / `.docx` / `.xlsx` | Parser abuse / XXE ideas | `limited_upload/documents/` |
+| formatos grandes | DoS controlado | `limited_upload/dos/` |
 
+---
 
+# 7. Convertir filenames aceptados en candidatos GET
 
-# 7. Limpieza
+Script:
+
+```bash
+bin/gen_get_candidates.py accepted_filenames.txt > candidates_get.txt
+```
+
+## Por qué existe
+
+En file upload, el nombre que el servidor acepta durante la subida no siempre coincide con el nombre que después tiene sentido pedir por URL.
+
+Ejemplo:
+
+```text
+filename aceptado: shell.jpg%00.phar
+```
+
+Si el backend guardó literalmente los caracteres `%`, `0`, `0`, entonces para pedir ese `%` por URL necesitas codificarlo como `%25`:
+
+```text
+GET candidate: shell.jpg%2500.phar
+```
+
+Este script genera variantes considerando:
+
+```text
+literal
+URL-encoded
+URL-decoded una vez
+URL-decoded dos veces
+sin caracteres de control
+truncado en caracteres de control
+normalización de slash/backslash
+trim de espacios y puntos finales
+```
+
+Ejemplos:
+
+| Filename aceptado | Candidatos típicos |
+|---|---|
+| `shell.jpg%00.phar` | `shell.jpg%2500.phar`, `shell.jpg%00.phar`, `shell.jpg.phar`, `shell.jpg` |
+| `shell.phar%0a.jpg` | `shell.phar%250a.jpg`, `shell.phar%0a.jpg`, `shell.phar.jpg`, `shell.phar` |
+| `shell%2ephp.jpg` | `shell%252ephp.jpg`, `shell%2ephp.jpg`, `shell.php.jpg` |
+
+Importante:
+
+```text
+Este script no descubre rutas.
+Solo transforma nombres de archivo aceptados en candidatos de URL.
+```
+
+El fuzzing de directorios o rutas de recuperación queda fuera de este toolkit.
+
+---
+
+# 8. Examples
+
+La carpeta `examples/` contiene recetas concretas de generación.
+
+Ejemplos recomendados:
+
+```text
+examples/
+├── 01-php-jpg-only.md
+├── 02-php-images-default.md
+├── 03-custom-allowed-extensions.md
+├── 04-server-side-multistack.md
+├── 05-mime-sources.md
+├── 06-content-snippets.md
+├── 07-magic-numbers.md
+├── 08-limited-upload-payloads.md
+└── 09-accepted-filenames-to-get-candidates.md
+```
+
+---
+
+# 9. Limpieza
 
 Eliminar resultados y wordlists generadas:
 
@@ -307,3 +606,17 @@ Eliminar resultados y wordlists generadas:
 bin/clean_results.sh
 ```
 
+---
+
+# Resumen rápido
+
+| Quiero... | Uso... |
+|---|---|
+| Generar filenames PHP evasivos | `bin/gen_filename_wordlist.sh` |
+| Usar whitelist `.jpg` propia | Tercer argumento de `gen_filename_wordlist.sh` |
+| Combinar PHP + ASP.NET + JSP | Crear ext file combinado y pasarlo al generador |
+| Usar MIME types | `wordlists/custom/upload_common_mime.txt` o SecLists |
+| Copiar payload PHP simple | `wordlists/content/php/php_funciona.php` |
+| Copiar magic bytes | `wordlists/content/magic_numbers/` |
+| Preparar payloads SVG/XML/EXIF/etc. | `wordlists/content/limited_upload/` |
+| Convertir aceptados a candidatos GET | `bin/gen_get_candidates.py` |
